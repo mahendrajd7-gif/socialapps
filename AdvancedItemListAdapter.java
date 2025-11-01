@@ -355,10 +355,12 @@ public class AdvancedItemListAdapter extends RecyclerView.Adapter<AdvancedItemLi
                                     new com.google.android.exoplayer2.source.ProgressiveMediaSource.Factory(dataSourceFactory)
                                             .createMediaSource(mediaItem);
 
+                            // prepare the shared player with this item's media but don't start playback yet
                             sharedPlayer.setMediaSource(mediaSource);
                             sharedPlayer.prepare();
+// keep it muted while preloading (no audible playback)
                             try { sharedPlayer.setVolume(0f); } catch (Throwable ignored) {}
-                            sharedPlayer.setPlayWhenReady(true);
+// IMPORTANT: do NOT call setPlayWhenReady(true) here; wait until a PlayerView is attached
                             try { sharedPlayer.setForegroundMode(true); } catch (Throwable ignored) {}
                         }
                     }
@@ -592,10 +594,30 @@ public class AdvancedItemListAdapter extends RecyclerView.Adapter<AdvancedItemLi
         com.google.android.exoplayer2.MediaItem mediaItem =
                 com.google.android.exoplayer2.MediaItem.fromUri(Uri.parse(url));
         try {
+            // Set media & prepare now (prebuffer), but don't start immediately unless the view is attached.
             sharedPlayer.setMediaItem(mediaItem);
             sharedPlayer.prepare();
-            sharedPlayer.setPlayWhenReady(true);
-            try { sharedPlayer.setForegroundMode(true); } catch (Throwable ignored) {}
+
+// reflect mute state immediately
+            try { sharedPlayer.setVolume(autoMuted ? 0f : 1f); } catch (Throwable ignored) {}
+            holder.btnMute.setImageResource(autoMuted ? R.drawable.volume_off : R.drawable.volume_on);
+
+// Start playback only if the PlayerView is already attached to window
+            if (holder.playerView.isAttachedToWindow()) {
+                try { sharedPlayer.setPlayWhenReady(true); } catch (Throwable ignored) {}
+                try { sharedPlayer.setForegroundMode(true); } catch (Throwable ignored) {}
+            } else {
+                // Defer starting playback until playerView is attached to the window.
+                android.view.View.OnAttachStateChangeListener startOnAttach = new android.view.View.OnAttachStateChangeListener() {
+                    @Override public void onViewAttachedToWindow(android.view.View v) {
+                        try { holder.playerView.removeOnAttachStateChangeListener(this); } catch (Throwable ignored) {}
+                        try { sharedPlayer.setPlayWhenReady(true); } catch (Throwable ignored) {}
+                        try { sharedPlayer.setForegroundMode(true); } catch (Throwable ignored) {}
+                    }
+                    @Override public void onViewDetachedFromWindow(android.view.View v) { }
+                };
+                try { holder.playerView.addOnAttachStateChangeListener(startOnAttach); } catch (Throwable ignored) {}
+            }
         } catch (Throwable t) {
             Log.e("ExoPlayer", "prepare failed", t);
             try { sharedPlayer.stop(); } catch (Throwable ignored) {}
