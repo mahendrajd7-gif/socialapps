@@ -166,7 +166,7 @@ public class AdvancedItemListAdapter extends RecyclerView.Adapter<AdvancedItemLi
 
     // --- Autoplay debounce fields (added) ---
     private long lastAutoPlayCheckAt = 0L;
-    private static final long AUTOPLAY_DEBOUNCE_MS = 80L;
+    private static final long AUTOPLAY_DEBOUNCE_MS = 120L;
     // --- end ---
 
     // default to true to keep previous behaviour (autoplay starts muted)
